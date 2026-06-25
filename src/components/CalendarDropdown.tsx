@@ -15,7 +15,7 @@ function fmtSelected(d: Date): string {
   return `${wd}, ${monthName(d.getMonth())} ${d.getDate()}, ${d.getFullYear()}`;
 }
 
-export function CalendarDropdown({ title }: { title: string }) {
+export function CalendarDropdown() {
   const store = useStore();
   const [open, setOpen] = useState(false);
   const [viewMonth, setViewMonth] = useState(
@@ -51,7 +51,6 @@ export function CalendarDropdown({ title }: { title: string }) {
         style={styles.bar}
         onPress={() => (open ? setOpen(false) : openCalendar())}
       >
-        <Text style={styles.title}>{title}</Text>
         <View style={styles.dateChip}>
           <Text style={styles.dateText}>{fmtSelected(selected)}</Text>
           <Text style={styles.chevron}>{open ? "▲" : "▼"}</Text>
@@ -140,11 +139,10 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-start",
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
   },
-  title: { color: colors.text, fontSize: 20, fontWeight: "700" },
   dateChip: {
     flexDirection: "row",
     alignItems: "center",

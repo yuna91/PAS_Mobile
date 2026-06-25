@@ -66,7 +66,6 @@ export function AlarmsScreen() {
   return (
     <View style={styles.flex}>
       <View style={styles.header}>
-        <Text style={styles.title}>Alarms</Text>
         <Pressable hitSlop={8} style={styles.addBtn} onPress={openNew}>
           <Text style={styles.addBtnText}>＋</Text>
         </Pressable>
@@ -257,14 +256,13 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
     paddingHorizontal: space.lg,
-    paddingVertical: space.md,
+    paddingVertical: space.sm,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  title: { color: colors.text, fontSize: 20, fontWeight: "700" },
   addBtn: {
     width: 34,
     height: 34,

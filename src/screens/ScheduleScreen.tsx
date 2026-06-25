@@ -32,7 +32,7 @@ export function ScheduleScreen() {
       style={styles.flex}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <CalendarDropdown title="Schedule" />
+      <CalendarDropdown />
       <View style={styles.body}>
         <TextInput
           style={styles.area}

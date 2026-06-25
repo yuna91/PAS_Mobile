@@ -2,7 +2,7 @@
 // tab bar, plus store load and alarm-notification reconciliation.
 
 import React, { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import PagerView from "react-native-pager-view";
@@ -33,6 +33,10 @@ export default function App() {
       <SafeAreaProvider>
         <View style={[styles.flex, styles.center]}>
           <StatusBar style="light" />
+          <Image
+            source={require("./assets/icon.png")}
+            style={styles.loadingIcon}
+          />
           <Text style={styles.loading}>PAS</Text>
         </View>
       </SafeAreaProvider>
@@ -112,6 +116,7 @@ function Shell() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
   center: { alignItems: "center", justifyContent: "center" },
+  loadingIcon: { width: 96, height: 96, borderRadius: 20, marginBottom: space.lg },
   loading: { color: colors.accent, fontSize: 32, fontWeight: "800" },
   tabs: {
     flexDirection: "row",
