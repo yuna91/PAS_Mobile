@@ -34,6 +34,14 @@
         {
           "color": "#4caf7d"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ]
   }
