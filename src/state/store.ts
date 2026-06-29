@@ -12,6 +12,10 @@ import { loadDataset, saveDataset, saveDatasetNow } from "../storage/asyncStore"
 class Store {
   private ds: Dataset = emptyDataset();
   private version = 0;
+  // Bumped only when a sync merge changes the data (not on local edits), so
+  // screens can re-seed their local input state from the store without fighting
+  // the user's in-progress typing.
+  private syncVersion = 0;
   private listeners = new Set<() => void>();
   // Notified only on *local* user edits (not on sync merges), so auto-sync can
   // push our changes without a merge re-triggering another push.
@@ -33,6 +37,8 @@ class Store {
     return () => this.listeners.delete(fn);
   };
   getVersion = (): number => this.version;
+  /** Changes only when a sync merge updated the data; use to re-seed screens. */
+  getSyncVersion = (): number => this.syncVersion;
 
   private bump() {
     this.version++;
@@ -155,6 +161,7 @@ class Store {
   async importMerged(remote: Dataset): Promise<Dataset> {
     this.ds = pruneTombstones(mergeDatasets(this.ds, remote));
     await saveDatasetNow(this.ds);
+    this.syncVersion++;
     this.bump();
     return this.ds;
   }

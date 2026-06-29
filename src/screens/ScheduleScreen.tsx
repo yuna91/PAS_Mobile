@@ -16,11 +16,15 @@ import { colors, space } from "../theme";
 export function ScheduleScreen() {
   const store = useStore();
   const key = store.selectedKey;
+  const syncVersion = store.getSyncVersion();
   const [text, setText] = useState(() => store.getSchedule());
 
+  // Re-seed on date change, and whenever a sync merge brings in newer data for
+  // the visible date (skip if it matches, so the cursor isn't disturbed).
   useEffect(() => {
-    setText(store.getSchedule(key));
-  }, [key]);
+    const current = store.getSchedule(key);
+    setText((prev) => (prev === current ? prev : current));
+  }, [key, syncVersion]);
 
   const onChange = (t: string) => {
     setText(t);

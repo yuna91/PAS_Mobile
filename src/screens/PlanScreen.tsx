@@ -23,9 +23,20 @@ import { PlanItem } from "../domain/types";
 import { uid } from "../domain/util";
 import { colors, radius, space } from "../theme";
 
+function samePlan(a: PlanItem[], b: PlanItem[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id || a[i].text !== b[i].text || a[i].done !== b[i].done) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function PlanScreen() {
   const store = useStore();
   const key = store.selectedKey;
+  const syncVersion = store.getSyncVersion();
 
   const [items, setItems] = useState<PlanItem[]>(() => store.getPlan());
   const [draft, setDraft] = useState("");
@@ -48,6 +59,15 @@ export function PlanScreen() {
     setItems(store.getPlan(key));
     setDraft("");
   }, [key]);
+
+  // Re-seed when a sync merge brings in newer data for the visible date. Skip
+  // during an active drag, and skip if unchanged so edits in progress and the
+  // drop animation aren't disturbed.
+  useEffect(() => {
+    if (dragId !== null) return;
+    const current = store.getPlan(key);
+    setItems((prev) => (samePlan(prev, current) ? prev : current));
+  }, [syncVersion]);
 
   const commit = useCallback((next: PlanItem[]) => {
     setItems(next);
