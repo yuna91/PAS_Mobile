@@ -1,229 +1,156 @@
-// Sync settings sheet: pair with the desktop (scan its QR or enter manually),
-// run a manual sync, view last-synced status, and unpair.
+// Camera-first sync: opening this modal turns on the camera immediately to
+// scan the desktop's pairing QR. On a successful scan it pairs and syncs in
+// one step, then closes. QR-only — no manual entry, no status buttons.
 
-import React, { useEffect, useState } from "react";
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
-import {
-  Peer,
-  getPeer,
-  pair,
-  parsePairing,
-  syncNow,
-  unpair,
-} from "../sync/syncClient";
+import { pair, parsePairing, syncNow } from "../sync/syncClient";
 import { colors, radius, space } from "../theme";
 
+type Phase = "scan" | "syncing" | "done" | "error";
+
+const SCAN_HINT = "Point at the QR code on your desktop (tray icon → Sync).";
+
 export function SyncModal({ onClose }: { onClose: () => void }) {
-  const [peer, setPeerState] = useState<Peer | null>(null);
-  const [mode, setMode] = useState<"status" | "scan" | "manual">("status");
-  const [status, setStatus] = useState<string>("");
-  const [busy, setBusy] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
-  const [manualUrl, setManualUrl] = useState("");
-  const [manualToken, setManualToken] = useState("");
+  const [phase, setPhase] = useState<Phase>("scan");
+  const [message, setMessage] = useState(SCAN_HINT);
+  const handled = useRef(false);
 
-  const refresh = async () => setPeerState(await getPeer());
+  // ask for camera access as soon as the modal opens
   useEffect(() => {
-    refresh();
-  }, []);
+    if (permission && !permission.granted && permission.canAskAgain) {
+      requestPermission();
+    }
+  }, [permission?.granted]);
 
-  const doPair = async (p: Peer) => {
-    await pair(p);
-    await refresh();
-    setMode("status");
-    setStatus("Paired. Tap “Sync now”.");
-  };
-
-  const onScan = (data: string) => {
-    const parsed = parsePairing(data);
-    if (!parsed) {
-      setStatus("That QR isn’t a PAS pairing code.");
-      setMode("status");
+  const handleScan = async (data: string) => {
+    if (handled.current || phase !== "scan") return;
+    const peer = parsePairing(data);
+    if (!peer) {
+      setMessage("That isn’t a PAS pairing code — keep pointing at the QR.");
       return;
     }
-    doPair(parsed);
-  };
-
-  const doSync = async () => {
-    setBusy(true);
-    setStatus("Syncing…");
+    handled.current = true;
+    setPhase("syncing");
+    setMessage("Syncing…");
+    await pair(peer);
     const r = await syncNow();
-    setBusy(false);
-    setStatus(r.ok ? "Synced ✓" : `Failed: ${r.error}`);
-    await refresh();
+    if (r.ok) {
+      setPhase("done");
+      setMessage("Synced ✓");
+      setTimeout(onClose, 1200);
+    } else {
+      setPhase("error");
+      setMessage(r.error || "Sync failed");
+    }
   };
 
-  const startScan = async () => {
-    if (!permission?.granted) {
-      const res = await requestPermission();
-      if (!res.granted) {
-        setStatus("Camera permission denied — use manual entry.");
-        return;
-      }
-    }
-    setMode("scan");
+  const retry = () => {
+    handled.current = false;
+    setMessage(SCAN_HINT);
+    setPhase("scan");
   };
 
   return (
-    <Modal transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
-          <View style={styles.head}>
-            <Text style={styles.title}>Sync with desktop</Text>
-            <Pressable hitSlop={8} onPress={onClose}>
-              <Text style={styles.close}>✕</Text>
-            </Pressable>
-          </View>
+    <Modal animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={styles.root} edges={["top", "bottom"]}>
+        <View style={styles.head}>
+          <Text style={styles.title}>Scan desktop QR</Text>
+          <Pressable hitSlop={10} onPress={onClose}>
+            <Text style={styles.close}>✕</Text>
+          </Pressable>
+        </View>
 
-          {mode === "scan" ? (
-            <View style={styles.scanWrap}>
+        <View style={styles.cameraWrap}>
+          {permission?.granted ? (
+            phase === "scan" ? (
               <CameraView
-                style={styles.camera}
+                style={StyleSheet.absoluteFill}
+                facing="back"
                 barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-                onBarcodeScanned={({ data }) => onScan(data)}
+                onBarcodeScanned={({ data }) => handleScan(data)}
               />
-              <Pressable style={styles.btn} onPress={() => setMode("status")}>
-                <Text style={styles.btnText}>Cancel</Text>
-              </Pressable>
-            </View>
-          ) : mode === "manual" ? (
-            <View style={styles.section}>
-              <Text style={styles.legend}>Desktop URL</Text>
-              <TextInput
-                style={styles.input}
-                value={manualUrl}
-                onChangeText={setManualUrl}
-                autoCapitalize="none"
-                placeholder="http://192.168.1.42:8787"
-                placeholderTextColor={colors.textDim}
-              />
-              <Text style={styles.legend}>Token</Text>
-              <TextInput
-                style={styles.input}
-                value={manualToken}
-                onChangeText={setManualToken}
-                autoCapitalize="none"
-                placeholder="pairing token"
-                placeholderTextColor={colors.textDim}
-              />
-              <View style={styles.row}>
-                <Pressable style={styles.btn} onPress={() => setMode("status")}>
-                  <Text style={styles.btnText}>Back</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.btn, styles.btnPrimary]}
-                  onPress={() =>
-                    onScan(
-                      JSON.stringify({ url: manualUrl, token: manualToken })
-                    )
-                  }
-                >
-                  <Text style={styles.btnTextPrimary}>Pair</Text>
-                </Pressable>
+            ) : (
+              <View style={[StyleSheet.absoluteFill, styles.center]}>
+                <Text style={styles.status}>{message}</Text>
+                {phase === "error" && (
+                  <View style={styles.row}>
+                    <Pressable style={[styles.btn, styles.btnPrimary]} onPress={retry}>
+                      <Text style={styles.btnTextPrimary}>Try again</Text>
+                    </Pressable>
+                    <Pressable style={styles.btn} onPress={onClose}>
+                      <Text style={styles.btnText}>Close</Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
-            </View>
+            )
           ) : (
-            <View style={styles.section}>
-              {peer ? (
-                <>
-                  <Text style={styles.paired}>Paired with {peer.url}</Text>
-                  <Text style={styles.sub}>
-                    {peer.lastSyncedAt
-                      ? `Last synced ${new Date(peer.lastSyncedAt).toLocaleString()}`
-                      : "Not synced yet"}
-                  </Text>
-                  <Pressable
-                    style={[styles.btn, styles.btnPrimary, busy && styles.btnDisabled]}
-                    disabled={busy}
-                    onPress={doSync}
-                  >
-                    <Text style={styles.btnTextPrimary}>Sync now</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.btn}
-                    onPress={async () => {
-                      await unpair();
-                      await refresh();
-                      setStatus("Unpaired.");
-                    }}
-                  >
-                    <Text style={styles.btnText}>Unpair</Text>
-                  </Pressable>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.sub}>
-                    Pair with PAS on your desktop (same Wi-Fi). Open Sync on the
-                    desktop to show its QR code.
-                  </Text>
-                  <Pressable style={[styles.btn, styles.btnPrimary]} onPress={startScan}>
-                    <Text style={styles.btnTextPrimary}>Scan QR code</Text>
-                  </Pressable>
-                  <Pressable style={styles.btn} onPress={() => setMode("manual")}>
-                    <Text style={styles.btnText}>Enter manually</Text>
-                  </Pressable>
-                </>
-              )}
-              {!!status && <Text style={styles.status}>{status}</Text>}
+            <View style={[StyleSheet.absoluteFill, styles.center]}>
+              <Text style={styles.status}>
+                Camera access is needed to scan the pairing QR.
+              </Text>
+              <Pressable
+                style={[styles.btn, styles.btnPrimary]}
+                onPress={() => requestPermission()}
+              >
+                <Text style={styles.btnTextPrimary}>Grant camera access</Text>
+              </Pressable>
             </View>
           )}
         </View>
-      </View>
+
+        {phase === "scan" && permission?.granted && (
+          <Text style={styles.hint}>{message}</Text>
+        )}
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    padding: space.lg,
-    paddingBottom: space.xl,
-    gap: space.sm,
-  },
+  root: { flex: 1, backgroundColor: colors.bg },
   head: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: space.sm,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
   },
   title: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  close: { color: colors.textDim, fontSize: 18 },
-  section: { gap: space.sm },
-  legend: { color: colors.textDim, fontSize: 12, marginTop: space.sm },
-  input: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: radius.md,
-    paddingHorizontal: space.md,
-    paddingVertical: space.sm,
-    color: colors.text,
-    fontSize: 15,
+  close: { color: colors.textDim, fontSize: 20 },
+  cameraWrap: {
+    flex: 1,
+    margin: space.lg,
+    borderRadius: radius.lg,
+    overflow: "hidden",
+    backgroundColor: "#000",
   },
-  row: { flexDirection: "row", gap: space.sm, marginTop: space.sm },
-  paired: { color: colors.text, fontSize: 15, fontWeight: "600" },
-  sub: { color: colors.textDim, fontSize: 13, lineHeight: 19 },
-  status: { color: colors.accent, fontSize: 13, marginTop: space.sm },
-  scanWrap: { gap: space.sm },
-  camera: { width: "100%", height: 280, borderRadius: radius.md, overflow: "hidden" },
+  center: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: space.xl,
+    gap: space.lg,
+  },
+  status: { color: colors.text, fontSize: 17, textAlign: "center" },
+  hint: {
+    color: colors.textDim,
+    fontSize: 13,
+    textAlign: "center",
+    paddingHorizontal: space.lg,
+    paddingBottom: space.md,
+  },
+  row: { flexDirection: "row", gap: space.sm },
   btn: {
+    paddingHorizontal: space.lg,
     paddingVertical: space.md,
     borderRadius: radius.md,
     backgroundColor: colors.surfaceAlt,
-    alignItems: "center",
-    flex: 1,
   },
   btnPrimary: { backgroundColor: colors.accent },
-  btnDisabled: { opacity: 0.4 },
   btnText: { color: colors.text, fontWeight: "600" },
   btnTextPrimary: { color: "#fff", fontWeight: "700" },
 });
