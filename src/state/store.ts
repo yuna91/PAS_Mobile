@@ -13,6 +13,9 @@ class Store {
   private ds: Dataset = emptyDataset();
   private version = 0;
   private listeners = new Set<() => void>();
+  // Notified only on *local* user edits (not on sync merges), so auto-sync can
+  // push our changes without a merge re-triggering another push.
+  private localListeners = new Set<() => void>();
   loaded = false;
 
   /** Currently selected date key, shared by Plan & Schedule. */
@@ -38,7 +41,14 @@ class Store {
   private commit() {
     saveDataset(this.ds);
     this.bump();
+    this.localListeners.forEach((f) => f());
   }
+
+  /** Subscribe to local user edits (commits), not sync merges. */
+  subscribeLocal = (fn: () => void): (() => void) => {
+    this.localListeners.add(fn);
+    return () => this.localListeners.delete(fn);
+  };
 
   // ---- selected date ----
   get selected(): Date {

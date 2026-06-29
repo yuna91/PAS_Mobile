@@ -7,6 +7,7 @@ import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { pair, parsePairing, syncNow } from "../sync/syncClient";
+import { nudgeAutoSync } from "../sync/autoSync";
 import { colors, radius, space } from "../theme";
 
 type Phase = "scan" | "syncing" | "done" | "error";
@@ -39,6 +40,7 @@ export function SyncModal({ onClose }: { onClose: () => void }) {
     await pair(peer);
     const r = await syncNow();
     if (r.ok) {
+      nudgeAutoSync(); // start live streaming from the desktop right away
       setPhase("done");
       setMessage("Synced ✓");
       setTimeout(onClose, 1200);

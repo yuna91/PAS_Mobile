@@ -12,6 +12,7 @@ import { ScheduleScreen } from "./src/screens/ScheduleScreen";
 import { AlarmsScreen } from "./src/screens/AlarmsScreen";
 import { store, useStore } from "./src/state/store";
 import { initNotifications, reconcileAlarms } from "./src/notifications/alarmScheduler";
+import { startAutoSync, stopAutoSync } from "./src/sync/autoSync";
 import { SyncModal } from "./src/components/SyncModal";
 import { colors, space } from "./src/theme";
 
@@ -25,7 +26,9 @@ export default function App() {
       await store.load();
       await initNotifications();
       setReady(true);
+      startAutoSync();
     })();
+    return () => stopAutoSync();
   }, []);
 
   if (!ready) {
