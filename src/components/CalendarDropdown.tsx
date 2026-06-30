@@ -45,17 +45,29 @@ export function CalendarDropdown() {
     setOpen(false);
   };
 
+  // Step one day without closing the calendar; keep the visible month in sync.
+  const step = (n: number) => {
+    const d = addDays(selected, n);
+    store.setSelected(new Date(d.getFullYear(), d.getMonth(), d.getDate()));
+    setViewMonth(new Date(d.getFullYear(), d.getMonth(), 1));
+  };
+
   return (
     <View style={styles.wrap}>
-      <Pressable
-        style={styles.bar}
-        onPress={() => (open ? setOpen(false) : openCalendar())}
-      >
-        <View style={styles.dateChip}>
-          <Text style={styles.dateText}>{fmtSelected(selected)}</Text>
-          <Text style={styles.chevron}>{open ? "▲" : "▼"}</Text>
-        </View>
-      </Pressable>
+      <View style={styles.bar}>
+        <Pressable hitSlop={10} onPress={() => step(-1)}>
+          <Text style={styles.nav}>‹</Text>
+        </Pressable>
+        <Pressable onPress={() => (open ? setOpen(false) : openCalendar())}>
+          <View style={styles.dateChip}>
+            <Text style={styles.dateText}>{fmtSelected(selected)}</Text>
+            <Text style={styles.chevron}>{open ? "▲" : "▼"}</Text>
+          </View>
+        </Pressable>
+        <Pressable hitSlop={10} onPress={() => step(1)}>
+          <Text style={styles.nav}>›</Text>
+        </Pressable>
+      </View>
 
       {open && (
         <View style={styles.panel}>
@@ -139,7 +151,8 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-start",
+    justifyContent: "center",
+    gap: space.md,
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
   },
